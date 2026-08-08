@@ -22,6 +22,9 @@ PM-railway/
 │   ├── queue_model.py                     ← M/M/c (Erlang-C) + Little's Law
 │   ├── visualization.py                   ← Graphs for the report
 │   └── run_analysis.py                    ← Main entry point
+├── docs/
+│   ├── Submission_1_Problem_and_Dataset.docx  ← 1st submission (problem + data set)
+│   └── Submission_2_Final_Report.docx         ← 2nd submission (final report, figures)
 ├── outputs/
 │   ├── performance_analysis.xlsx            ← Summary + one sheet per scenario
 │   ├── 01_utilisation_comparison.png
@@ -96,6 +99,14 @@ python generate_dataset.py
 ```bash
 cd scripts
 python queue_model.py
+```
+
+### Re-generate the submission Word documents
+
+```bash
+pip install python-docx
+cd scripts
+python build_submission_docs.py
 ```
 
 ## Key Results (M/M/c, matching the report)
