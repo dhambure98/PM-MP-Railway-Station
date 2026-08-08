@@ -2,6 +2,10 @@
 
 **Topic:** Performance Modelling of Passenger Flow at a Major Railway Station during Peak Hours
 
+**Student:** Akila Dhambure Liyanage
+**Registration Number:** 320267120
+
+## Project Description
 This project analyses passenger flow at a railway station ticket concourse during the morning peak period (07:00 – 09:00) using queueing theory (M/M/c / Erlang-C), a discrete-event simulation, and a simulated passenger-level dataset. It covers the EEI6373 mini-project requirements: system description and performance goals, modelling approach and assumptions, data description, detailed analysis, visualisations, limitations and future work.
 
 > **Important:** The passenger-level dataset is **simulated**. It is not real railway-station observations.
@@ -145,4 +149,5 @@ The simulated dataset is compared against the analytical model in `run_analysis.
 5. **06_waiting_trend.png** – average counter waiting time per 10-minute bin over the peak period (Normal passengers), with analytical Wq as reference.
 6. **04_ticket_type_comparison.png** – average counter wait, gate wait and total time for Normal vs Online ticket passengers.
 7. **05_sensitivity_analysis.png** – Wq vs arrival rate for c = 3, 4 and 5 counters.
+
 
