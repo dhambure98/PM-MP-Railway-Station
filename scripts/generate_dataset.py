@@ -13,6 +13,8 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from queue_model import generate_arrivals, simulate_mmc_queue
+
 random.seed(42)  # for reproducibility
 
 START_TIME = datetime(2026, 8, 8, 7, 0, 0)
@@ -36,32 +38,6 @@ def random_exponential(mean):
     return random.expovariate(1.0 / mean)
 
 
-def generate_arrivals(n, rate_per_hour):
-    """Poisson-process arrivals with a fixed count and fixed window.
-
-    Sorted uniform order statistics over [0, total_min] are statistically
-    equivalent to conditioning a Poisson process on exactly N arrivals, so the
-    arrival rate stays rate_per_hour and the span is exactly 2 hours.
-    """
-    total_min = n * 60.0 / rate_per_hour
-    return sorted(random.uniform(0.0, total_min) for _ in range(n))
-
-
-def simulate_mmc_queue(arrival_times_min, service_mean_min, c):
-    """FIFO M/M/c event simulation -> list of (wait, service, departure) in minutes."""
-    free = [0.0] * c
-    results = []
-    for a in arrival_times_min:
-        server = min(range(c), key=lambda i: free[i])
-        start = max(a, free[server])
-        wait = start - a
-        svc = random_exponential(service_mean_min)
-        dep = start + svc
-        free[server] = dep
-        results.append((wait, svc, dep))
-    return results
-
-
 def main():
     normal_arrivals = generate_arrivals(NUM_NORMAL, LAMBDA_NORMAL)
     online_arrivals = generate_arrivals(NUM_ONLINE, LAMBDA_ONLINE)
@@ -71,32 +47,36 @@ def main():
 
     # Normal ticket passengers -> M/M/c queue simulation
     for arr_min, (wait, svc, _dep) in zip(normal_arrivals, normal_sim):
-        entry_wait = max(0.05, random_exponential(0.6))
+        gate_wait = max(0.05, random_exponential(0.6))
+        gate_service = max(0.05, random_exponential(GATE_MEAN_SERVICE))
         boarding_wait = max(1.0, random_exponential(BOARDING_MEAN_WAIT))
-        total = wait + svc + entry_wait + boarding_wait
+        total = wait + svc + gate_wait + gate_service + boarding_wait
         records.append({
             "Passenger_ID": "",
             "Arrival_Time": (START_TIME + timedelta(minutes=arr_min)).strftime("%H:%M:%S"),
             "Ticket_Type": "Normal",
             "Counter_Wait_Min": round(wait, 2),
             "Counter_Service_Min": round(svc, 2),
-            "Entry_Wait_Min": round(entry_wait, 2),
+            "Gate_Wait_Min": round(gate_wait, 2),
+            "Gate_Service_Min": round(gate_service, 2),
             "Boarding_Wait_Min": round(boarding_wait, 2),
             "Total_Time_Min": round(total, 2),
         })
 
     # Online ticket passengers -> bypass the ticket counter
     for arr_min in online_arrivals:
-        entry_wait = max(0.05, random_exponential(0.35))
+        gate_wait = max(0.05, random_exponential(0.35))
+        gate_service = max(0.05, random_exponential(GATE_MEAN_SERVICE))
         boarding_wait = max(1.0, random_exponential(BOARDING_MEAN_WAIT))
-        total = entry_wait + boarding_wait
+        total = gate_wait + gate_service + boarding_wait
         records.append({
             "Passenger_ID": "",
             "Arrival_Time": (START_TIME + timedelta(minutes=arr_min)).strftime("%H:%M:%S"),
             "Ticket_Type": "Online",
             "Counter_Wait_Min": 0.0,
             "Counter_Service_Min": 0.0,
-            "Entry_Wait_Min": round(entry_wait, 2),
+            "Gate_Wait_Min": round(gate_wait, 2),
+            "Gate_Service_Min": round(gate_service, 2),
             "Boarding_Wait_Min": round(boarding_wait, 2),
             "Total_Time_Min": round(total, 2),
         })
@@ -114,7 +94,8 @@ def main():
         writer = csv.DictWriter(f, fieldnames=[
             "Passenger_ID", "Arrival_Time", "Ticket_Type",
             "Counter_Wait_Min", "Counter_Service_Min",
-            "Entry_Wait_Min", "Boarding_Wait_Min", "Total_Time_Min"
+            "Gate_Wait_Min", "Gate_Service_Min",
+            "Boarding_Wait_Min", "Total_Time_Min"
         ])
         writer.writeheader()
         writer.writerows(records)

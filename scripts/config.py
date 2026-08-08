@@ -14,6 +14,7 @@ TOTAL_PASSENGERS = 400
 
 # Analytical model parameters (used in report)
 LAMBDA_NORMAL = 90.0          # passengers per hour (180 / 2)
+LAMBDA_ONLINE = 110.0         # passengers per hour (220 / 2)
 MU_COUNTER = 40.0             # passengers per hour per counter
 C_COUNTERS_BASE = 3
 

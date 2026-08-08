@@ -19,13 +19,14 @@ PM-railway/
 │   ├── visualization.py                   ← Graphs for the report
 │   └── run_analysis.py                    ← Main entry point
 ├── outputs/
+│   ├── performance_analysis.xlsx            ← Summary + one sheet per scenario
 │   ├── 01_utilisation_comparison.png
 │   ├── 02_waiting_vs_counters.png
 │   ├── 03_arrival_intensity.png
 │   ├── 04_ticket_type_comparison.png
-│   └── 05_sensitivity_analysis.png
-├── docs/
-│   └── report.md                          ← Formal report (all required sections)
+│   ├── 05_sensitivity_analysis.png
+│   ├── 06_waiting_trend.png
+│   └── 07_system_flow_diagram.png
 ├── .gitignore
 ├── requirements.txt
 └── README.md
@@ -37,8 +38,17 @@ PM-railway/
 - Total passengers: **400**
   - Normal ticket: **180** → λ ≈ 90 passengers/hour (queue at ticket counters)
   - Online ticket: **220** → λ ≈ 110 passengers/hour (bypass the counters)
-- Columns: `Passenger_ID`, `Arrival_Time`, `Ticket_Type`, `Counter_Wait_Min`, `Counter_Service_Min`, `Entry_Wait_Min`, `Boarding_Wait_Min`, `Total_Time_Min`
+- Columns: `Passenger_ID`, `Arrival_Time`, `Ticket_Type`, `Counter_Wait_Min`, `Counter_Service_Min`, `Gate_Wait_Min`, `Gate_Service_Min`, `Boarding_Wait_Min`, `Total_Time_Min`
 - The Normal passenger counter waits are produced by an actual FIFO M/M/c discrete-event simulation (c = 3, μ = 40/hour), so the data validate the analytical model (simulated mean wait 1.22 min vs analytical Wq 1.14 min).
+
+## Dataset Statistics (printed by `run_analysis.py`)
+
+- Total passengers: **400** — Normal **180 (45.0%)**, Online **220 (55.0%)**
+- Normal arrival rate λ = **90/hour**; Online arrival rate λ = **110/hour**
+- System throughput: **200 passengers/hour**
+- Mean counter service (Normal): 1.456 min → μ ≈ **41.2/hour** (target 40)
+- Mean counter wait (Normal): **1.22 min**; mean gate wait (all): **0.49 min**
+- Mean total time: **8.67 min** (Normal) vs **5.88 min** (Online)
 
 ## Setup on Windows
 
@@ -63,7 +73,6 @@ pip install -r requirements.txt
 ```
 
 ## How to Run
-
 ### Run the full analysis + generate graphs (recommended)
 
 ```bash
@@ -96,6 +105,21 @@ python queue_model.py
 
 Little's Law (Lq = λ × Wq) is applied as a consistency check and matches within rounding.
 
+## Scenario Results (Excel)
+
+`run_analysis.py` runs the four scenarios as a **controlled experiment** (same seed per
+replication; one parameter changed at a time) and exports everything to
+`outputs/performance_analysis.xlsx` with:
+
+- **Summary** sheet — analytical ρ, P(wait), Lq, Wq and simulated mean wait/service per scenario.
+- One sheet per scenario (`Baseline (Normal Peak)`, `Busy Morning`, `Busy + 5 Counters`,
+  `Busy + Faster Service`) — the per-passenger counter simulation records.
+
+The simulated mean wait in the Summary is the average over **20 independent 2-hour
+replications** (each queue starts empty). Because the finite window includes the
+transient warm-up, simulated waits sit at or below the steady-state M/M/c Wq, and the gap
+grows with utilisation (e.g. Busy Morning: simulated ≈ 2.99 min vs steady-state 5.08 min).
+
 ## Analytical values used in the report
 
 - λ = 180 normal passengers / 2 hours = **90 / hour**
@@ -114,25 +138,11 @@ The simulated dataset is compared against the analytical model in `run_analysis.
 
 ## What the Visualisations Show
 
-1. **01_utilisation_comparison.png** – utilisation of ticket counters (baseline and busy) and entry gates, with the high-congestion threshold.
-2. **02_waiting_vs_counters.png** – how adding ticket counters reduces Wq under λ = 110/hour.
-3. **03_arrival_intensity.png** – arrival intensity across 07:00 – 09:00 (passengers per 10-minute bin).
-4. **04_ticket_type_comparison.png** – average counter wait, entry wait and total time for Normal vs Online ticket passengers.
-5. **05_sensitivity_analysis.png** – Wq vs arrival rate for c = 3, 4 and 5 counters.
+1. **07_system_flow_diagram.png** – passenger flow chain: Normal passengers queue at ticket counters, Online passengers bypass them; both proceed through gates, platform and boarding.
+2. **01_utilisation_comparison.png** – utilisation of ticket counters (baseline and busy) and entry gates, with the high-congestion threshold.
+3. **02_waiting_vs_counters.png** – how adding ticket counters reduces Wq under λ = 110/hour.
+4. **03_arrival_intensity.png** – arrival intensity across 07:00 – 09:00 (passengers per 10-minute bin).
+5. **06_waiting_trend.png** – average counter waiting time per 10-minute bin over the peak period (Normal passengers), with analytical Wq as reference.
+6. **04_ticket_type_comparison.png** – average counter wait, gate wait and total time for Normal vs Online ticket passengers.
+7. **05_sensitivity_analysis.png** – Wq vs arrival rate for c = 3, 4 and 5 counters.
 
-## Report
-
-The full formal report with all required sections (system description & goals, modelling approach & assumptions, data & methodology, detailed analysis & findings, visualisations, limitations & future extensions, references) is in **`docs/report.md`**.
-
-## Notes for the Viva
-
-- λ = 180 / 2 hours = **90 passengers/hour**; μ = **40 passengers/hour** per counter (1.5 min mean service time).
-- Little's Law is used as a consistency check between Lq and Wq.
-- **Ticket counters are the main bottleneck** for Normal ticket passengers (Baseline ρ = 0.75; Busy Morning ρ = 0.917 → Wq grows from 1.14 to 5.08 min).
-- Adding counters (c = 5) or faster service (μ = 50) both cut Wq below 1 min; c = 5 keeps Wq under 0.3 min even at λ = 130/hour.
-- **Online ticket passengers largely bypass the counter queue** (total time 5.0 vs 8.7 min for Normal).
-- Limitations: simulated data, steady-state M/M/c assumptions, no balking/reneging, homogeneous service times.
-
-## Academic Integrity
-
-The assignment states that use of AI/plagiarism or other academic misconduct can result in zero marks. Use this repository as a modelling/implementation aid, understand every section, and write/verify your own final submission and explanations.

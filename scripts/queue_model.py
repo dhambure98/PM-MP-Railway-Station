@@ -1,8 +1,10 @@
 """
-Simple M/M/c calculations for the Railway Station project
+M/M/c queueing model for the Railway Station project:
+analytical metrics (Erlang-C, Little's Law) + discrete-event simulation.
 """
 
-import math
+import heapq
+import random
 import sys
 from math import factorial
 
@@ -56,6 +58,29 @@ def littles_law_check(lam, Wq_min):
     """Lq should ≈ λ * (Wq in hours)"""
     Wq_hour = Wq_min / 60.0
     return round(lam * Wq_hour, 3)
+
+def generate_arrivals(n, rate_per_hour, rng=None):
+    """Poisson-process arrivals with a fixed count and fixed window.
+    """
+    rng = rng or random
+    total_min = n * 60.0 / rate_per_hour
+    return sorted(rng.uniform(0.0, total_min) for _ in range(n))
+
+def simulate_mmc_queue(arrival_times_min, service_mean_min, c, rng=None):
+    """FIFO M/M/c discrete-event simulation.
+    """
+    rng = rng or random
+    free = [0.0] * c
+    results = []
+    for a in arrival_times_min:
+        server = min(range(c), key=lambda i: free[i])
+        start = max(a, free[server])
+        wait = start - a
+        svc = rng.expovariate(1.0 / service_mean_min)
+        dep = start + svc
+        free[server] = dep
+        results.append((wait, svc, dep))
+    return results
 
 if __name__ == "__main__":
     # Demo matching the report
