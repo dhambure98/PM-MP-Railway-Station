@@ -1,98 +1,115 @@
 """
 Generate simulated passenger flow dataset for Railway Station Peak Hour Analysis
 Peak period: 07:00 - 09:00 (2 hours)
+
+Normal (ticket-counter) passengers are produced by a FIFO M/M/c discrete-event
+simulation (c = 3 counters, service mean 1.5 min => mu = 40/hour, arrival rate
+90/hour) so the simulated counter wait converges to the analytical Erlang-C
+result (Wq ~ 1.14 min). Online passengers bypass the ticket counters entirely.
 """
 
 import csv
 import random
 from datetime import datetime, timedelta
+from pathlib import Path
 
 random.seed(42)  # for reproducibility
 
-# Configuration (matches report assumptions)
 START_TIME = datetime(2026, 8, 8, 7, 0, 0)
-END_TIME = datetime(2026, 8, 8, 9, 0, 0)
-DURATION_HOURS = 2.0
 
-# Target numbers
-NUM_NORMAL = 180          # → λ_normal ≈ 90 / hour
-NUM_ONLINE = 220          # online passengers
-TOTAL = NUM_NORMAL + NUM_ONLINE
+# Target numbers (lambda in passengers/hour)
+NUM_NORMAL = 180
+NUM_ONLINE = 220
+LAMBDA_NORMAL = 90.0
+LAMBDA_ONLINE = 110.0
 
-# Service parameters (minutes)
-COUNTER_MEAN_SERVICE = 1.5      # → μ ≈ 40 / hour
+# Queue parameters for the ticket counter (M/M/c)
+C_COUNTERS = 3
+SERVICE_MEAN_MIN = 1.5   # => mu = 40 passengers/hour
+
+# Downstream phases (descriptive data, not part of the M/M/c validation)
 GATE_MEAN_SERVICE = 0.4
 BOARDING_MEAN_WAIT = 5.0
+
 
 def random_exponential(mean):
     return random.expovariate(1.0 / mean)
 
-def generate_arrival_times(n, start, end):
-    """Generate roughly uniform arrivals with some clustering for realism"""
-    times = []
-    total_seconds = (end - start).total_seconds()
-    for _ in range(n):
-        # slight morning peak bias
-        offset = random.betavariate(2, 2) * total_seconds
-        times.append(start + timedelta(seconds=offset))
-    times.sort()
-    return times
+
+def generate_arrivals(n, rate_per_hour):
+    """Poisson-process arrivals with a fixed count and fixed window.
+
+    Sorted uniform order statistics over [0, total_min] are statistically
+    equivalent to conditioning a Poisson process on exactly N arrivals, so the
+    arrival rate stays rate_per_hour and the span is exactly 2 hours.
+    """
+    total_min = n * 60.0 / rate_per_hour
+    return sorted(random.uniform(0.0, total_min) for _ in range(n))
+
+
+def simulate_mmc_queue(arrival_times_min, service_mean_min, c):
+    """FIFO M/M/c event simulation -> list of (wait, service, departure) in minutes."""
+    free = [0.0] * c
+    results = []
+    for a in arrival_times_min:
+        server = min(range(c), key=lambda i: free[i])
+        start = max(a, free[server])
+        wait = start - a
+        svc = random_exponential(service_mean_min)
+        dep = start + svc
+        free[server] = dep
+        results.append((wait, svc, dep))
+    return results
+
 
 def main():
-    normal_arrivals = generate_arrival_times(NUM_NORMAL, START_TIME, END_TIME)
-    online_arrivals = generate_arrival_times(NUM_ONLINE, START_TIME, END_TIME)
+    normal_arrivals = generate_arrivals(NUM_NORMAL, LAMBDA_NORMAL)
+    online_arrivals = generate_arrivals(NUM_ONLINE, LAMBDA_ONLINE)
+    normal_sim = simulate_mmc_queue(normal_arrivals, SERVICE_MEAN_MIN, C_COUNTERS)
 
     records = []
-    pid = 1
 
-    # Normal ticket passengers
-    for arr in normal_arrivals:
-        counter_wait = max(0.1, random_exponential(2.0))      # higher wait
-        counter_service = max(0.3, random_exponential(COUNTER_MEAN_SERVICE))
+    # Normal ticket passengers -> M/M/c queue simulation
+    for arr_min, (wait, svc, _dep) in zip(normal_arrivals, normal_sim):
         entry_wait = max(0.05, random_exponential(0.6))
         boarding_wait = max(1.0, random_exponential(BOARDING_MEAN_WAIT))
-        total = counter_wait + counter_service + entry_wait + boarding_wait
-
+        total = wait + svc + entry_wait + boarding_wait
         records.append({
-            "Passenger_ID": f"P{pid:03d}",
-            "Arrival_Time": arr.strftime("%H:%M:%S"),
+            "Passenger_ID": "",
+            "Arrival_Time": (START_TIME + timedelta(minutes=arr_min)).strftime("%H:%M:%S"),
             "Ticket_Type": "Normal",
-            "Counter_Wait_Min": round(counter_wait, 2),
-            "Counter_Service_Min": round(counter_service, 2),
+            "Counter_Wait_Min": round(wait, 2),
+            "Counter_Service_Min": round(svc, 2),
             "Entry_Wait_Min": round(entry_wait, 2),
             "Boarding_Wait_Min": round(boarding_wait, 2),
-            "Total_Time_Min": round(total, 2)
+            "Total_Time_Min": round(total, 2),
         })
-        pid += 1
 
-    # Online ticket passengers (skip counter mostly)
-    for arr in online_arrivals:
-        counter_wait = 0.0
-        counter_service = 0.0
+    # Online ticket passengers -> bypass the ticket counter
+    for arr_min in online_arrivals:
         entry_wait = max(0.05, random_exponential(0.35))
         boarding_wait = max(1.0, random_exponential(BOARDING_MEAN_WAIT))
         total = entry_wait + boarding_wait
-
         records.append({
-            "Passenger_ID": f"P{pid:03d}",
-            "Arrival_Time": arr.strftime("%H:%M:%S"),
+            "Passenger_ID": "",
+            "Arrival_Time": (START_TIME + timedelta(minutes=arr_min)).strftime("%H:%M:%S"),
             "Ticket_Type": "Online",
             "Counter_Wait_Min": 0.0,
             "Counter_Service_Min": 0.0,
             "Entry_Wait_Min": round(entry_wait, 2),
             "Boarding_Wait_Min": round(boarding_wait, 2),
-            "Total_Time_Min": round(total, 2)
+            "Total_Time_Min": round(total, 2),
         })
-        pid += 1
 
-    # Sort by arrival time
+    # Sort by arrival time and assign sequential IDs
     records.sort(key=lambda r: r["Arrival_Time"])
-
-    # Re-assign sequential IDs after sorting
     for i, r in enumerate(records, 1):
         r["Passenger_ID"] = f"P{i:03d}"
 
-    out_path = "/home/workdir/artifacts/railway_performance_modelling/data/passenger_flow_peak_hours.csv"
+    project_root = Path(__file__).resolve().parent.parent
+    data_dir = project_root / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    out_path = data_dir / "passenger_flow_peak_hours.csv"
     with open(out_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=[
             "Passenger_ID", "Arrival_Time", "Ticket_Type",
@@ -105,6 +122,14 @@ def main():
     print(f"Generated {len(records)} records")
     print(f"Normal: {NUM_NORMAL}, Online: {NUM_ONLINE}")
     print(f"Saved to: {out_path}")
+
+    # Quick validation vs the analytical model
+    sim_wait = sum(w for w, _, _ in normal_sim) / NUM_NORMAL
+    sim_svc = sum(s for _, s, _ in normal_sim) / NUM_NORMAL
+    print(f"Normal counter mean wait (simulated): {sim_wait:.3f} min")
+    print(f"Normal counter mean service (simulated): {sim_svc:.3f} min "
+          f"(target 1.500 -> mu = {60 / sim_svc:.2f}/hr, target 40)")
+
 
 if __name__ == "__main__":
     main()

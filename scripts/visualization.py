@@ -4,17 +4,27 @@ Requires: matplotlib, pandas
 """
 
 import os
+from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
 from queue_model import mmc_metrics
+from config import LAMBDA_NORMAL, MU_COUNTER, C_COUNTERS_BASE, MU_GATE, C_GATES, TOTAL_PASSENGERS
 
-OUTPUT_DIR = "/home/workdir/artifacts/railway_performance_modelling/outputs"
-DATA_PATH = "/home/workdir/artifacts/railway_performance_modelling/data/passenger_flow_peak_hours.csv"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "outputs"
+DATA_PATH = PROJECT_ROOT / "data" / "passenger_flow_peak_hours.csv"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+GATE_LAMBDA = TOTAL_PASSENGERS / 2.0  # all passengers pass the gates in 2 hours
+
 def plot_utilisation_comparison():
-    labels = ["Ticket Counters\n(c=3, λ=90)", "Ticket Counters\n(Busy λ=110)", "Entry Gates\n(approx)"]
-    rhos = [0.75, 0.92, 0.30]  # illustrative gate util
+    rho_base = mmc_metrics(LAMBDA_NORMAL, MU_COUNTER, C_COUNTERS_BASE)["rho"]
+    rho_busy = mmc_metrics(110, MU_COUNTER, C_COUNTERS_BASE)["rho"]
+    rho_gate = GATE_LAMBDA / (C_GATES * MU_GATE)
+    labels = [f"Ticket Counters\n(λ={LAMBDA_NORMAL:.0f}, c={C_COUNTERS_BASE})",
+              "Ticket Counters\n(Busy λ=110)",
+              f"Entry Gates\n(λ={GATE_LAMBDA:.0f}, c={C_GATES})"]
+    rhos = [rho_base, rho_busy, rho_gate]
     colors = ["#e74c3c", "#c0392b", "#3498db"]
 
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -97,10 +107,32 @@ def plot_ticket_type_comparison():
     plt.close()
     print(f"Saved: {path}")
 
+def plot_sensitivity_analysis():
+    lam_range = list(range(70, 141, 5))
+    mu = 40
+    fig, ax = plt.subplots(figsize=(9, 5))
+    for c in (3, 4, 5):
+        wqs = []
+        for lam in lam_range:
+            res = mmc_metrics(lam, mu, c)
+            wqs.append(res["Wq_min"] if res["stable"] else 30)
+        ax.plot(lam_range, wqs, marker="o", label=f"c = {c} counters")
+    ax.set_xlabel("Arrival rate λ (passengers/hour)")
+    ax.set_ylabel("Average waiting time Wq (minutes)")
+    ax.set_title("Sensitivity: Wq vs Arrival Rate for Different Counter Counts")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    path = os.path.join(OUTPUT_DIR, "05_sensitivity_analysis.png")
+    plt.savefig(path, dpi=150)
+    plt.close()
+    print(f"Saved: {path}")
+
 if __name__ == "__main__":
     print("Generating visualisations...")
     plot_utilisation_comparison()
     plot_waiting_vs_counters()
     plot_queue_length_over_time()
     plot_ticket_type_comparison()
+    plot_sensitivity_analysis()
     print("Done.")

@@ -3,7 +3,13 @@ Simple M/M/c calculations for the Railway Station project
 """
 
 import math
+import sys
 from math import factorial
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 
 def erlang_c(c, rho):
     """Probability of waiting (Erlang-C)"""
