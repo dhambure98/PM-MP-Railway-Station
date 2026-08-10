@@ -1,13 +1,3 @@
-"""
-Generate simulated passenger flow dataset for Railway Station Peak Hour Analysis
-Peak period: 07:00 - 09:00 (2 hours)
-
-Normal (ticket-counter) passengers are produced by a FIFO M/M/c discrete-event
-simulation (c = 3 counters, service mean 1.5 min => mu = 40/hour, arrival rate
-90/hour) so the simulated counter wait converges to the analytical Erlang-C
-result (Wq ~ 1.14 min). Online passengers bypass the ticket counters entirely.
-"""
-
 import csv
 import random
 from datetime import datetime, timedelta

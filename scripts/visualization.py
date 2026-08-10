@@ -1,5 +1,3 @@
-"""Generate graphs for the Mini Project report Requires: matplotlib, pandas"""
-
 import os
 from pathlib import Path
 import pandas as pd

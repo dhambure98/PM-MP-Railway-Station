@@ -1,7 +1,3 @@
-"""
-Configuration matching the Mini Project report assumptions
-"""
-
 # Peak period
 PEAK_START = "07:00"
 PEAK_END = "09:00"

@@ -1,7 +1,3 @@
-"""
-Main script: run calculations + generate all outputs
-"""
-
 import os
 import random
 import sys

@@ -1,8 +1,3 @@
-"""
-M/M/c queueing model for the Railway Station project:
-analytical metrics (Erlang-C, Little's Law) + discrete-event simulation.
-"""
-
 import heapq
 import random
 import sys
@@ -67,8 +62,6 @@ def generate_arrivals(n, rate_per_hour, rng=None):
     return sorted(rng.uniform(0.0, total_min) for _ in range(n))
 
 def simulate_mmc_queue(arrival_times_min, service_mean_min, c, rng=None):
-    """FIFO M/M/c discrete-event simulation.
-    """
     rng = rng or random
     free = [0.0] * c
     results = []
@@ -83,7 +76,6 @@ def simulate_mmc_queue(arrival_times_min, service_mean_min, c, rng=None):
     return results
 
 if __name__ == "__main__":
-    # Demo matching the report
     print("=== Baseline (λ=90, μ=40, c=3) ===")
     r = mmc_metrics(90, 40, 3)
     print(r)
